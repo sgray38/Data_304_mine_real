@@ -1,0 +1,229 @@
+---
+title: "Assingment_5"
+author: "Sage Gray"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sjPlot)
+library(igraph)
+library(networkD3)
+```
+
+*Load in data*
+```{r}
+paths <- read.csv("course_pathways.csv")
+majors <- read.csv("course_catalog_by_major.csv")
+head(paths)
+head(majors)
+```
+*Grab just CECS Students*
+```{r}
+cecsers <- paths |>
+  filter((Major == "Data science") | (Major == "Artificial intelligence") | (Major == "Cybersecurity"))
+head(cecsers)
+
+stu_paths <- str_split(cecsers$CoursePath, " -> ", simplify = TRUE)
+stu_paths <- data.frame(stu_paths)
+stu_paths$StudentID <- cecsers$StudentID
+stu_paths <- stu_paths |>
+  relocate(StudentID)
+
+cecsers$CoursePath <- NULL
+cecsers <- merge(cecsers, stu_paths)
+cecsers$Program <- NULL
+
+
+data_majors <- cecsers|>
+  filter(Major == "Data science")
+
+ai_majors <- cecsers |>
+  filter(Major == "Artificial intelligence")
+
+cybersec_majors <- cecsers |>
+  filter(Major == "Cybersecurity")
+
+```
+*Filter out Electives*
+```{r}
+majors
+data_elect_titles <- majors|>
+  filter(Major == "Data science") |>
+  filter(Type == "Elective")
+data_elect_titles
+
+data_elect <- c()
+for(i in 1:nrow(data_elect_titles)){
+  data_elect[i] <- data_elect_titles$Course[i]
+}
+
+cyber_elect_titles <- majors|>
+  filter(Major == "Cybersecurity") |>
+  filter(Type == "Elective")
+cyber_elect_titles
+
+cyber_elect <- c()
+for(i in 1:nrow(cyber_elect_titles)){
+  cyber_elect[i] <- cyber_elect_titles$Course[i]
+}
+
+ai_elect_titles <- majors|>
+  filter(Major == "Artificial intelligence") |>
+  filter(Type == "Elective")
+ai_elect_titles
+
+ai_elect <- c()
+for(i in 1:nrow(ai_elect_titles)){
+  ai_elect[i] <- ai_elect_titles$Course[i]
+}
+```
+
+*Filter Electives out of cecsers*
+```{r}
+
+for(i in 1:nrow(data_majors)){
+  for(j in 3:ncol(data_majors)){
+    if(data_majors[i,j] %in% data_elect){
+      data_majors[i,j] <- NA
+    }
+  }
+}
+
+data_majors <- data_majors[, colSums(is.na(data_majors)) == 0]
+
+data_majors
+
+
+for(i in 1:nrow(ai_majors)){
+  for(j in 3:ncol(ai_majors)){
+    if(ai_majors[i,j] %in% ai_elect){
+      ai_majors[i,j] <- NA
+    }
+  }
+}
+
+ai_majors <- ai_majors[, colSums(is.na(ai_majors)) == 0]
+
+ai_majors
+
+
+for(i in 1:nrow(cybersec_majors)){
+  for(j in 3:ncol(cybersec_majors)){
+    if(cybersec_majors[i,j] %in% cyber_elect){
+      cybersec_majors[i,j] <- NA
+    }
+  }
+}
+
+cybersec_majors <- cybersec_majors[, colSums(is.na(cybersec_majors)) == 0]
+
+cybersec_majors
+```
+*Extract Transitions*
+```{r}
+
+data_links <- c()
+for(i in 3:ncol(data_majors)){
+  data_links[i-2] <- data_majors[1, i]
+}
+data_links
+
+ai_links <- c()
+for(i in 3:ncol(ai_majors)){
+  ai_links[i-2] <- ai_majors[1,i]
+}
+ai_links
+
+cyber_links <- c()
+for(i in 3:ncol(cybersec_majors)){
+  cyber_links[i-2] <- cybersec_majors[1,i]
+}
+cyber_links
+
+data_count <- 0
+for(i in 1:nrow(data_majors)){
+  if(sum(data_majors[i, 3:ncol(data_majors)] == data_majors[1, 3:ncol(data_majors)]) == 10){
+    data_count <- data_count + 1
+  }
+}
+data_count
+
+cyber_count <- 0
+for(i in 1:nrow(cybersec_majors)){
+  if(sum(cybersec_majors[i, 3:ncol(cybersec_majors)] == cybersec_majors[1, 3:ncol(cybersec_majors)]) == 10){
+    cyber_count <- cyber_count + 1
+  }
+}
+cyber_count
+
+ai_count <- 0
+for(i in 1:nrow(ai_majors)){
+  if(sum(ai_majors[i, 3:ncol(ai_majors)] == ai_majors[1, 3:ncol(ai_majors)]) == 10){
+    ai_count <- ai_count + 1
+  }
+}
+ai_count
+
+
+```
+
+```{r}
+source <- c()
+for(i in 1:(length(data_links)-1)){
+  source[i] <- data_links[i]
+}
+for(i in 1:(length(ai_links)-1)){
+  source <- append(source, ai_links[i])
+}
+for(i in 1:(length(cyber_links)-1)){
+  source<-append(source,cyber_links[i])
+}
+source
+
+target <- c()
+for(i in 2:length(data_links)){
+  target <- append(target, data_links[i])
+}
+for(i in 2:length(ai_links)){
+  target <- append(target, ai_links[i])
+}
+for(i in 2:length(cyber_links)){
+  target <- append(target, cyber_links[i])
+}
+target
+
+
+value <- c()
+for(i in 1:length(target)){
+  value <- append(value, 40)
+}
+links <- data.frame(
+  source,
+  target,
+  value
+)
+links
+
+name = c(data_links[1], ai_links[1], cyber_links[1])
+for(i in 1:length(target)){
+  name = append(name, target[i])
+}
+name <- unique(name)
+nodes <- data.frame(name)
+
+links$IDsource <- match(links$source, nodes$name) - 1 
+links$IDtarget <- match(links$target, nodes$name) - 1
+
+sankey <- sankeyNetwork(Links = links, Nodes = nodes,
+                        Source = "IDsource", Target = "IDtarget",
+                        Value = "value", NodeID = "name",
+                        sinksRight = FALSE)
+
+# Display the Sankey diagram.
+sankey
+```
